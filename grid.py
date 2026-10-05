@@ -2,6 +2,7 @@ import tkinter as tk
 
 CANVAS_SIZE = 500
 EMPTY_COLOR = "white"
+DEFAULT_SIZE = 10  # rows and cols a grid starts with
 PALETTE = [
     ("Black", "#000000"),
     ("Red", "#e53935"),
@@ -29,12 +30,12 @@ class Grid:
         controls.pack(pady=5)
 
         tk.Label(controls, text="Rows:").pack(side=tk.LEFT)
-        self.rows_var = tk.IntVar(value=10)
+        self.rows_var = tk.IntVar(value=DEFAULT_SIZE)
         tk.Spinbox(controls, from_=1, to=100, textvariable=self.rows_var, width=5,
                    command=self.draw).pack(side=tk.LEFT, padx=5)
 
         tk.Label(controls, text="Cols:").pack(side=tk.LEFT)
-        self.cols_var = tk.IntVar(value=10)
+        self.cols_var = tk.IntVar(value=DEFAULT_SIZE)
         tk.Spinbox(controls, from_=1, to=100, textvariable=self.cols_var, width=5,
                    command=self.draw).pack(side=tk.LEFT, padx=5)
 
@@ -63,6 +64,12 @@ class Grid:
                 row.append(self.canvas.create_rectangle(x, y, x + self.cell_size, y + self.cell_size,
                                                         outline="black", fill=EMPTY_COLOR))
             self.cells.append(row)
+
+    def reset(self):
+        # Set the size back to the default (10x10) and clear all the colors
+        self.rows_var.set(DEFAULT_SIZE)
+        self.cols_var.set(DEFAULT_SIZE)
+        self.draw()
 
     def paint(self, event, color):
         # "current" tag doesn't update when a button is held down so figure out current position
@@ -110,6 +117,11 @@ def copy_left_to_right():
             grid2.canvas.itemconfig(grid2.cells[row][col], fill=color)
 
 
+def reset_grids():
+    grid1.reset()
+    grid2.reset()
+
+
 root = tk.Tk()
 root.title("Grid")
 
@@ -118,7 +130,7 @@ top.pack(pady=5)
 
 # Grid count radio buttons
 tk.Label(top, text="Grids:").pack(side=tk.LEFT)
-grid_count_var = tk.IntVar(value=1)
+grid_count_var = tk.IntVar(value=2) # Default to 2 grids
 for count in (1, 2):
     tk.Radiobutton(top, text=str(count), variable=grid_count_var, value=count,
                    command=on_grid_count_change).pack(side=tk.LEFT)
@@ -133,6 +145,8 @@ for name, color in PALETTE:
 color_label = tk.Label(palette, text=PALETTE[0][0], width=7, anchor="w")
 color_label.pack(side=tk.LEFT, padx=5)
 
+tk.Button(top, text="Reset", command=reset_grids).pack(side=tk.LEFT, padx=(20, 0))
+
 copy_button = tk.Button(top, text="Copy left -> right", command=copy_left_to_right)  # only packed when 2 is selected
 
 grids = tk.Frame(root)
@@ -140,5 +154,6 @@ grids.pack()
 grid1 = Grid(grids)
 grid1.frame.pack(side=tk.LEFT, anchor="n")
 grid2 = Grid(grids)  # only packed when 2 is selected
+on_grid_count_change()  # show grid 2 and the copy button
 
 root.mainloop()
