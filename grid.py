@@ -1,4 +1,7 @@
 import tkinter as tk
+from pathlib import Path
+
+from export import make_image
 
 CANVAS_SIZE = 500
 EMPTY_COLOR = "white"
@@ -78,6 +81,10 @@ class Grid:
         if 0 <= row < len(self.cells) and 0 <= col < len(self.cells[0]):
             self.canvas.itemconfig(self.cells[row][col], fill=color)
 
+    def get_colors(self):
+        # colors[row][col] is the color of that square
+        return [[self.canvas.itemcget(cell, "fill") for cell in row] for row in self.cells]
+
     def on_left_click(self, event):
         self.paint(event, brush_color)
 
@@ -122,6 +129,28 @@ def reset_grids():
     grid2.reset()
 
 
+def save_image():
+    # Use the export module to make an image (should be the same as the old tool)
+    grids = [grid1.get_colors()]
+    if grid_count_var.get() == 2:
+        grids.append(grid2.get_colors())
+
+    names = [f"{len(colors[0])}x{len(colors)}" for colors in grids]
+    name = "grid_" + "+".join(names)
+    folder = Path("images")
+
+    folder.mkdir(exist_ok=True)
+    path = folder / f"{name}.png"
+
+    # Prevent overwriting existing files
+    number = 1
+    while path.exists():
+        path = folder / f"{name} ({number}).png"
+        number += 1
+    make_image(grids).save(path)
+    print(f"Saved {path}")
+
+
 root = tk.Tk()
 root.title("Grid")
 
@@ -146,6 +175,7 @@ color_label = tk.Label(palette, text=PALETTE[0][0], width=7, anchor="w")
 color_label.pack(side=tk.LEFT, padx=5)
 
 tk.Button(top, text="Reset", command=reset_grids).pack(side=tk.LEFT, padx=(20, 0))
+tk.Button(top, text="Make image", command=save_image).pack(side=tk.LEFT, padx=(5, 0))
 
 copy_button = tk.Button(top, text="Copy left -> right", command=copy_left_to_right)  # only packed when 2 is selected
 
