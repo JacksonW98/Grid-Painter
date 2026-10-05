@@ -92,8 +92,22 @@ def on_grid_count_change():
     # The second grid is hidden rather than deleted
     if grid_count_var.get() == 2:
         grid2.frame.pack(side=tk.LEFT, anchor="n")
+        copy_button.pack(side=tk.LEFT, padx=(20, 0))
     else:
         grid2.frame.pack_forget()
+        copy_button.pack_forget()
+
+
+def copy_left_to_right():
+    # Copy the left grid (size and colors) to the right
+    grid2.rows_var.set(grid1.rows_var.get())
+    grid2.cols_var.set(grid1.cols_var.get())
+    grid2.draw()
+    for row in range(len(grid1.cells)):
+        for col in range(len(grid1.cells[row])):
+            # Reads the color of the grid on grid1 and copies it over to grid 2
+            color = grid1.canvas.itemcget(grid1.cells[row][col], "fill")
+            grid2.canvas.itemconfig(grid2.cells[row][col], fill=color)
 
 
 root = tk.Tk()
@@ -118,6 +132,8 @@ for name, color in PALETTE:
     swatch.bind("<Button-1>", on_swatch_click)
 color_label = tk.Label(palette, text=PALETTE[0][0], width=7, anchor="w")
 color_label.pack(side=tk.LEFT, padx=5)
+
+copy_button = tk.Button(top, text="Copy left -> right", command=copy_left_to_right)  # only packed when 2 is selected
 
 grids = tk.Frame(root)
 grids.pack()
