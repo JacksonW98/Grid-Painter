@@ -1,5 +1,7 @@
+import ast
 import tkinter as tk
 from pathlib import Path
+from tkinter import messagebox
 
 from export import make_image
 
@@ -41,6 +43,9 @@ class Grid:
         self.cols_var = tk.IntVar(value=DEFAULT_SIZE)
         tk.Spinbox(controls, from_=1, to=100, textvariable=self.cols_var, width=5,
                    command=self.draw).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(controls, text="Import", command=self.on_import).pack(side=tk.LEFT, padx=(10, 0))
+        tk.Button(controls, text="Export", command=self.on_export).pack(side=tk.LEFT)
 
         self.canvas = tk.Canvas(self.frame, width=CANVAS_SIZE, height=CANVAS_SIZE,
                                 bg=EMPTY_COLOR, highlightthickness=0)
@@ -85,11 +90,45 @@ class Grid:
         # colors[row][col] is the color of that square
         return [[self.canvas.itemcget(cell, "fill") for cell in row] for row in self.cells]
 
+    def on_export(self):
+        # Copy the grid to the clipboard
+        color_names = {color: name for name, color in PALETTE}
+        names = [[color_names.get(color, "") for color in row] for row in self.get_colors()]
+        text = str(names)
+        self.frame.clipboard_clear()
+        self.frame.clipboard_append(text)
+        print(text)
+
+    def on_import(self):
+        # Read the grid from the clipboard
+        # TODO add input validation
+        text = self.frame.clipboard_get()
+        colors = parse_grid(text)
+
+        self.rows_var.set(len(colors))
+        self.cols_var.set(len(colors[0]))
+        self.draw()
+        for row in range(len(colors)):
+            for col in range(len(colors[row])):
+                self.canvas.itemconfig(self.cells[row][col], fill=colors[row][col])
+
     def on_left_click(self, event):
         self.paint(event, brush_color)
 
     def on_right_click(self, event):
         self.paint(event, EMPTY_COLOR)
+
+
+def parse_grid(text):
+    names = ast.literal_eval(text)
+
+    name_colors = {name: color for name, color in PALETTE}
+    name_colors[""] = EMPTY_COLOR
+    for row in names:
+        for name in row:
+            if name not in name_colors:
+                raise ValueError(f"Unknown colour: {name}")
+    return [[name_colors[name] for name in row] for row in names]
 
 
 def on_swatch_click(event):
