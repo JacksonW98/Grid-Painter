@@ -1,9 +1,9 @@
-import ast
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox
+from tkinter import filedialog
 
 from export import LINE_COLOR, make_image
+from tasks import load_task, save_task
 
 CANVAS_SIZE = 500
 DEFAULT_SIZE = 10  # rows and cols a grid starts with
@@ -37,16 +37,14 @@ class Grid:
 
         tk.Label(controls, text="Rows:").pack(side=tk.LEFT)
         self.rows_var = tk.IntVar(value=DEFAULT_SIZE)
-        tk.Spinbox(controls, from_=1, to=100, textvariable=self.rows_var, width=5,
+        tk.Spinbox(controls, from_=1, to=30, textvariable=self.rows_var, width=5,
                    command=self.draw).pack(side=tk.LEFT, padx=5)
 
         tk.Label(controls, text="Cols:").pack(side=tk.LEFT)
         self.cols_var = tk.IntVar(value=DEFAULT_SIZE)
-        tk.Spinbox(controls, from_=1, to=100, textvariable=self.cols_var, width=5,
+        tk.Spinbox(controls, from_=1, to=30, textvariable=self.cols_var, width=5,
                    command=self.draw).pack(side=tk.LEFT, padx=5)
 
-        tk.Button(controls, text="Import", command=self.on_import).pack(side=tk.LEFT, padx=(10, 0))
-        tk.Button(controls, text="Export", command=self.on_export).pack(side=tk.LEFT)
 
         self.canvas = tk.Canvas(self.frame, width=CANVAS_SIZE, height=CANVAS_SIZE,
                                 bg=EMPTY_COLOR, highlightthickness=0)
@@ -91,26 +89,18 @@ class Grid:
         # colors[row][col] is the color of that square
         return [[self.canvas.itemcget(cell, "fill") for cell in row] for row in self.cells]
 
-    def on_export(self):
-        # Copy the grid to the clipboard as array, e.g. [[0, 1], [2, 3]]
-        values = [[PALETTE.index(color) for color in row] for row in self.get_colors()]
-        text = str(values)
-        self.frame.clipboard_clear()
-        self.frame.clipboard_append(text)
-        print(text)
+    def get_values(self):
+        # values[row][col] is that square's ARC value (0-9)
+        return [[PALETTE.index(color) for color in row] for row in self.get_colors()]
 
-    def on_import(self):
-        # Read the grid from the clipboard
-        # TODO add input validation
-        text = self.frame.clipboard_get()
-        colors = parse_grid(text)
-
-        self.rows_var.set(len(colors))
-        self.cols_var.set(len(colors[0]))
+    def set_values(self, values):
+        # Resize the grid to fit values and color each square
+        self.rows_var.set(len(values))
+        self.cols_var.set(len(values[0]))
         self.draw()
-        for row in range(len(colors)):
-            for col in range(len(colors[row])):
-                self.canvas.itemconfig(self.cells[row][col], fill=colors[row][col])
+        for row in range(len(values)):
+            for col in range(len(values[row])):
+                self.canvas.itemconfig(self.cells[row][col], fill=PALETTE[values[row][col]])
 
     def on_left_click(self, event):
         self.paint(event, brush_color)
@@ -119,15 +109,97 @@ class Grid:
         self.paint(event, EMPTY_COLOR)
 
 
-def parse_grid(text):
-    values = ast.literal_eval(text)
+def blank_grid():
+    return [[0] * DEFAULT_SIZE for _ in range(DEFAULT_SIZE)]
 
-    for row in values:
-        for value in row:
-            # bool is a subclass of int, so rule it out explicitly
-            if type(value) is not int or not 0 <= value <= 9:
-                raise ValueError(f"Not a colour value (0-9): {value!r}")
-    return [[PALETTE[value] for value in row] for row in values]
+
+def new_pair():
+    return {"input": blank_grid(), "output": blank_grid()}
+
+
+# The task being made. The two grids show (and edit) one pair of it at a time
+task = {"train": [new_pair()], "test": []}
+current = ("train", 0)  # (section, index) of the pair on the grids
+
+
+def store_current_pair():
+    # Copy what is on the grids back into the task
+    section, index = current
+    task[section][index] = {"input": grid1.get_values(), "output": grid2.get_values()}
+
+
+def load_pair(section, index):
+    # Put the pair task[section][index] on the grids (without storing the old one)
+    global current
+    current = (section, index)
+    pair = task[section][index]
+    grid1.set_values(pair["input"])
+    grid2.set_values(pair["output"])
+    pair_label.config(text=f"{section.title()} {index + 1}")
+    refresh_pair_list()
+
+
+def show_pair(section, index):
+    # Store the pair on the grids, then switch to task[section][index]
+    store_current_pair()
+    load_pair(section, index)
+
+
+def pair_order():
+    # Every pair in the order it is listed: train pairs, then test pairs
+    return [(section, index) for section in ("train", "test") for index in range(len(task[section]))]
+
+
+def refresh_pair_list():
+    pair_list.delete(0, tk.END)
+    for section, index in pair_order():
+        pair_list.insert(tk.END, f"{section.title()} {index + 1}")
+    pair_list.selection_set(pair_order().index(current))
+
+
+def open_task():
+    # Replace the task with one from a JSON file and show its first pair
+    global task
+    path = filedialog.askopenfilename(filetypes=[("JSON", "*.json")])
+    if not path:
+        return  # cancelled
+    task = load_task(path)
+    load_pair(*pair_order()[0])
+
+
+def save_task_as():
+    # Save the whole task to a JSON file
+    store_current_pair()
+    path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON", "*.json")])
+    if not path:
+        return  # cancelled
+    save_task(task, path)
+    print(f"Saved {path}")
+
+
+def on_pair_select(event):
+    selected = pair_list.curselection()
+    if selected:
+        show_pair(*pair_order()[selected[0]])
+
+
+def add_pair(section):
+    # Add a blank pair to the end of the section and switch to it
+    store_current_pair()
+    task[section].append(new_pair())
+    load_pair(section, len(task[section]) - 1)
+
+
+def remove_pair():
+    # Remove the pair on the grids and show the one listed after it (or before, if it was last)
+    order = pair_order()
+    if len(order) == 1:
+        return  # keep at least one pair to show on the grids
+    position = order.index(current)
+    section, index = current
+    del task[section][index]
+    order = pair_order()
+    load_pair(*order[min(position, len(order) - 1)])
 
 
 def on_swatch_click(event):
@@ -138,26 +210,9 @@ def on_swatch_click(event):
     color_label.config(text=PALETTE.index(brush_color))
 
 
-def on_grid_count_change():
-    # The second grid is hidden rather than deleted
-    if grid_count_var.get() == 2:
-        grid2.frame.pack(side=tk.LEFT, anchor="n")
-        copy_button.pack(side=tk.LEFT, padx=(20, 0))
-    else:
-        grid2.frame.pack_forget()
-        copy_button.pack_forget()
-
-
 def copy_left_to_right():
     # Copy the left grid (size and colors) to the right
-    grid2.rows_var.set(grid1.rows_var.get())
-    grid2.cols_var.set(grid1.cols_var.get())
-    grid2.draw()
-    for row in range(len(grid1.cells)):
-        for col in range(len(grid1.cells[row])):
-            # Reads the color of the grid on grid1 and copies it over to grid 2
-            color = grid1.canvas.itemcget(grid1.cells[row][col], "fill")
-            grid2.canvas.itemconfig(grid2.cells[row][col], fill=color)
+    grid2.set_values(grid1.get_values())
 
 
 def reset_grids():
@@ -167,9 +222,7 @@ def reset_grids():
 
 def save_image():
     # Use the export module to make an image (should be the same as the old tool)
-    grids = [grid1.get_colors()]
-    if grid_count_var.get() == 2:
-        grids.append(grid2.get_colors())
+    grids = [grid1.get_colors(), grid2.get_colors()]
 
     names = [f"{len(colors[0])}x{len(colors)}" for colors in grids]
     name = "grid_" + "+".join(names)
@@ -193,15 +246,12 @@ root.title("Grid")
 top = tk.Frame(root)
 top.pack(pady=5)
 
-# Grid count radio buttons
-tk.Label(top, text="Grids:").pack(side=tk.LEFT)
-grid_count_var = tk.IntVar(value=2) # Default to 2 grids
-for count in (1, 2):
-    tk.Radiobutton(top, text=str(count), variable=grid_count_var, value=count,
-                   command=on_grid_count_change).pack(side=tk.LEFT)
+# Which pair of the task is on the grids
+pair_label = tk.Label(top, text="Train 1", width=8, anchor="w", font=("TkDefaultFont", 14, "bold"))
+pair_label.pack(side=tk.LEFT, padx=(0, 20))
 
 palette = tk.Frame(top)
-palette.pack(side=tk.LEFT, padx=(20, 0))
+palette.pack(side=tk.LEFT)
 # macOS ignores the background color of buttons so I just used labels instead
 for color in PALETTE:
     swatch = tk.Label(palette, bg=color, width=2, height=1)
@@ -210,16 +260,30 @@ for color in PALETTE:
 color_label = tk.Label(palette, text=1, width=2, anchor="w")
 color_label.pack(side=tk.LEFT, padx=5)
 
+tk.Button(top, text="Open task", command=open_task).pack(side=tk.LEFT, padx=(20, 0))
+tk.Button(top, text="Save task", command=save_task_as).pack(side=tk.LEFT, padx=(5, 0))
 tk.Button(top, text="Reset", command=reset_grids).pack(side=tk.LEFT, padx=(20, 0))
 tk.Button(top, text="Make image", command=save_image).pack(side=tk.LEFT, padx=(5, 0))
 
-copy_button = tk.Button(top, text="Copy left -> right", command=copy_left_to_right)  # only packed when 2 is selected
+tk.Button(top, text="Copy input -> output", command=copy_left_to_right).pack(side=tk.LEFT, padx=(20, 0))
 
 grids = tk.Frame(root)
 grids.pack()
+
+# Listbox of the task's pairs
+sidebar = tk.Frame(grids)
+sidebar.pack(side=tk.LEFT, anchor="n", padx=(10, 0), pady=5)
+tk.Label(sidebar, text="Pairs", font=("TkDefaultFont", 14, "bold")).pack()
+pair_list = tk.Listbox(sidebar, width=10, height=12, exportselection=False, activestyle="none")
+pair_list.pack(pady=5)
+pair_list.bind("<<ListboxSelect>>", on_pair_select)
+tk.Button(sidebar, text="+ Train", command=lambda: add_pair("train")).pack(fill=tk.X)
+tk.Button(sidebar, text="+ Test", command=lambda: add_pair("test")).pack(fill=tk.X)
+tk.Button(sidebar, text="Remove", command=remove_pair).pack(fill=tk.X)
 grid1 = Grid(grids)
 grid1.frame.pack(side=tk.LEFT, anchor="n")
-grid2 = Grid(grids)  # only packed when 2 is selected
-on_grid_count_change()  # show grid 2 and the copy button
+grid2 = Grid(grids)
+grid2.frame.pack(side=tk.LEFT, anchor="n")
+refresh_pair_list()
 
 root.mainloop()
