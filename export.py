@@ -79,17 +79,22 @@ def make_image(grids):
     return img
 
 
-def make_task_image(task, palette):
-    # Draw every grid pair
-    pairs = [(pair_name(task, section, i), pair) for section in ("train", "test")
+def make_task_image(task, palette, hide_test_output=False):
+    # Draw every grid pair. With hide_test_output, test outputs are left blank
+    pairs = [(pair_name(task, section, i), section, pair) for section in ("train", "test")
              for i, pair in enumerate(task[section])]
+
+    def hidden(section, key):
+        return hide_test_output and section == "test" and key == "output"
 
     def grid_height(grid):
         # Height of the grid once it is scaled to fit a BOX x BOX square
         return BOX * len(grid) / max(len(grid), len(grid[0]))
 
     # Each row is only as tall as its tallest grid, so wide grids don't leave gaps
-    box_heights = [max(grid_height(pair["input"]), grid_height(pair["output"])) for _, pair in pairs]
+    # (a hidden output doesn't count, so the row doesn't give away its size)
+    box_heights = [max(grid_height(pair[key]) for key in ("input", "output") if not hidden(section, key))
+                   for _, section, pair in pairs]
     width = 2 * MARGIN + NAME_WIDTH + 2 * BOX + ARROW_WIDTH
     height = round(2 * MARGIN + sum(LABEL_SPACE + h for h in box_heights) + (len(pairs) - 1) * ROW_GAP)
     img = Image.new("RGB", (width, height), "white")
@@ -97,7 +102,7 @@ def make_task_image(task, palette):
     font = ImageFont.load_default(LABEL_SIZE)
 
     y = MARGIN
-    for number, ((name, pair), box_height) in enumerate(zip(pairs, box_heights)):
+    for number, ((name, section, pair), box_height) in enumerate(zip(pairs, box_heights)):
         if number == len(task["train"]) and number > 0:
             # Line between the trai and test pairs
             line_y = round(y - ROW_GAP / 2)
@@ -109,11 +114,12 @@ def make_task_image(task, palette):
 
         x = MARGIN + NAME_WIDTH
         for key in ("input", "output"):
-            grid = [[palette[value] for value in row] for row in pair[key]]
-            rows, cols = len(grid), len(grid[0])
-            cell = BOX / max(rows, cols)
-            # Centre the grid in its box
-            draw_grid(draw, grid, x + (BOX - cell * cols) / 2, box_top + (box_height - cell * rows) / 2, cell, font)
+            if not hidden(section, key):  # a hidden test output is left blank TODO add a question mark symbol or something
+                grid = [[palette[value] for value in row] for row in pair[key]]
+                rows, cols = len(grid), len(grid[0])
+                cell = BOX / max(rows, cols)
+                # Centre the grid in its box
+                draw_grid(draw, grid, x + (BOX - cell * cols) / 2, box_top + (box_height - cell * rows) / 2, cell, font)
             x += BOX + ARROW_WIDTH
 
         # Arrow from the input to the output

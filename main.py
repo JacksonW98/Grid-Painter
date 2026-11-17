@@ -241,7 +241,7 @@ def save_image():
                                         initialdir=folder, initialfile="task.png")
     if not path:
         return  # cancelled
-    make_task_image(task, PALETTE).save(path)
+    make_task_image(task, PALETTE, hide_test_output=hide_test_var.get()).save(path)
     print(f"Saved {path}")
 
 
@@ -270,6 +270,9 @@ tk.Button(top, text="Open task", command=open_task).pack(side=tk.LEFT, padx=(5, 
 tk.Button(top, text="Save task", command=save_task_as).pack(side=tk.LEFT, padx=(5, 0))
 tk.Button(top, text="Reset", command=reset_grids).pack(side=tk.LEFT, padx=(20, 0))
 tk.Button(top, text="Make image", command=save_image).pack(side=tk.LEFT, padx=(5, 0))
+
+hide_test_var = tk.BooleanVar(value=False)
+tk.Checkbutton(top, text="Hide test output", variable=hide_test_var).pack(side=tk.LEFT, padx=(5, 0))
 
 tk.Button(top, text="Copy input -> output", command=copy_left_to_right).pack(side=tk.LEFT, padx=(20, 0))
 
