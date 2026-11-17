@@ -2,7 +2,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog
 
-from export import LINE_COLOR, make_image
+from export import LINE_COLOR, make_task_image, pair_name
 from tasks import load_task, save_task
 
 CANVAS_SIZE = 500
@@ -135,7 +135,7 @@ def load_pair(section, index):
     pair = task[section][index]
     grid1.set_values(pair["input"])
     grid2.set_values(pair["output"])
-    pair_label.config(text=f"{section.title()} {index + 1}")
+    pair_label.config(text=pair_name(task, section, index))
     refresh_pair_list()
 
 
@@ -153,8 +153,10 @@ def pair_order():
 def refresh_pair_list():
     pair_list.delete(0, tk.END)
     for section, index in pair_order():
-        pair_list.insert(tk.END, f"{section.title()} {index + 1}")
+        pair_list.insert(tk.END, pair_name(task, section, index))
     pair_list.selection_set(pair_order().index(current))
+    # Only one test pair can be added
+    add_test_button.config(state=tk.DISABLED if task["test"] else tk.NORMAL)
 
 
 def open_task():
@@ -185,6 +187,8 @@ def on_pair_select(event):
 
 def add_pair(section):
     # Add a blank pair to the end of the section and switch to it
+    if section == "test" and task["test"]:
+        return  # only one test pair can be added
     store_current_pair()
     task[section].append(new_pair())
     load_pair(section, len(task[section]) - 1)
@@ -221,22 +225,15 @@ def reset_grids():
 
 
 def save_image():
-    # Use the export module to make an image (should be the same as the old tool)
-    grids = [grid1.get_colors(), grid2.get_colors()]
-
-    names = [f"{len(colors[0])}x{len(colors)}" for colors in grids]
-    name = "grid_" + "+".join(names)
+    # Save an image of the whole task
+    store_current_pair()
     folder = Path("images")
-
     folder.mkdir(exist_ok=True)
-    path = folder / f"{name}.png"
-
-    # Prevent overwriting existing files
-    number = 1
-    while path.exists():
-        path = folder / f"{name} ({number}).png"
-        number += 1
-    make_image(grids).save(path)
+    path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG", "*.png")],
+                                        initialdir=folder, initialfile="task.png")
+    if not path:
+        return  # cancelled
+    make_task_image(task, PALETTE).save(path)
     print(f"Saved {path}")
 
 
@@ -278,7 +275,8 @@ pair_list = tk.Listbox(sidebar, width=10, height=12, exportselection=False, acti
 pair_list.pack(pady=5)
 pair_list.bind("<<ListboxSelect>>", on_pair_select)
 tk.Button(sidebar, text="+ Train", command=lambda: add_pair("train")).pack(fill=tk.X)
-tk.Button(sidebar, text="+ Test", command=lambda: add_pair("test")).pack(fill=tk.X)
+add_test_button = tk.Button(sidebar, text="+ Test", command=lambda: add_pair("test"))  # disabled once there is a test pair
+add_test_button.pack(fill=tk.X)
 tk.Button(sidebar, text="Remove", command=remove_pair).pack(fill=tk.X)
 grid1 = Grid(grids)
 grid1.frame.pack(side=tk.LEFT, anchor="n")
