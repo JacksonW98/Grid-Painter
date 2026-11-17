@@ -1,6 +1,6 @@
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 from export import LINE_COLOR, make_task_image, pair_name
 from tasks import load_task, save_task
@@ -159,6 +159,14 @@ def refresh_pair_list():
     add_test_button.config(state=tk.DISABLED if task["test"] else tk.NORMAL)
 
 
+def new_task():
+    global task
+    if not messagebox.askyesno("New task", "Clear this task?"):
+        return
+    task = {"train": [new_pair()], "test": []}
+    load_pair("train", 0)
+
+
 def open_task():
     # Replace the task with one from a JSON file and show its first pair
     global task
@@ -257,7 +265,8 @@ for color in PALETTE:
 color_label = tk.Label(palette, text=1, width=2, anchor="w")
 color_label.pack(side=tk.LEFT, padx=5)
 
-tk.Button(top, text="Open task", command=open_task).pack(side=tk.LEFT, padx=(20, 0))
+tk.Button(top, text="New task", command=new_task).pack(side=tk.LEFT, padx=(20, 0))
+tk.Button(top, text="Open task", command=open_task).pack(side=tk.LEFT, padx=(5, 0))
 tk.Button(top, text="Save task", command=save_task_as).pack(side=tk.LEFT, padx=(5, 0))
 tk.Button(top, text="Reset", command=reset_grids).pack(side=tk.LEFT, padx=(20, 0))
 tk.Button(top, text="Make image", command=save_image).pack(side=tk.LEFT, padx=(5, 0))
