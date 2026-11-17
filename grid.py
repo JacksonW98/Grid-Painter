@@ -3,24 +3,25 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox
 
-from export import make_image
+from export import LINE_COLOR, make_image
 
 CANVAS_SIZE = 500
-EMPTY_COLOR = "white"
 DEFAULT_SIZE = 10  # rows and cols a grid starts with
 PALETTE = [
-    ("Black", "#000000"),
-    ("Red", "#e53935"),
-    ("Orange", "#fb8c00"),
-    ("Yellow", "#fdd835"),
-    ("Green", "#43a047"),
-    ("Blue", "#1e88e5"),
-    ("Purple", "#8e24aa"),
-    ("Pink", "#ec407a"),
-    ("Grey", "#9e9e9e"),
+    "#000000",  # 0 black
+    "#0074D9",  # 1 blue
+    "#FF4136",  # 2 red
+    "#2ECC40",  # 3 green
+    "#FFDC00",  # 4 yellow
+    "#AAAAAA",  # 5 gray
+    "#F012BE",  # 6 fuchsia
+    "#FF851B",  # 7 orange
+    "#7FDBFF",  # 8 teal
+    "#870C25",  # 9 brown
 ]
+EMPTY_COLOR = PALETTE[0]  # default to 0 (black)
 
-brush_color = PALETTE[0][1]  # defaults to black
+brush_color = PALETTE[1]  # defaults to blue
 
 
 class Grid:
@@ -70,7 +71,7 @@ class Grid:
             for j in range(cols):
                 x, y = j * self.cell_size, i * self.cell_size
                 row.append(self.canvas.create_rectangle(x, y, x + self.cell_size, y + self.cell_size,
-                                                        outline="black", fill=EMPTY_COLOR))
+                                                        outline=LINE_COLOR, fill=EMPTY_COLOR))
             self.cells.append(row)
 
     def reset(self):
@@ -91,10 +92,9 @@ class Grid:
         return [[self.canvas.itemcget(cell, "fill") for cell in row] for row in self.cells]
 
     def on_export(self):
-        # Copy the grid to the clipboard
-        color_names = {color: name for name, color in PALETTE}
-        names = [[color_names.get(color, "") for color in row] for row in self.get_colors()]
-        text = str(names)
+        # Copy the grid to the clipboard as array, e.g. [[0, 1], [2, 3]]
+        values = [[PALETTE.index(color) for color in row] for row in self.get_colors()]
+        text = str(values)
         self.frame.clipboard_clear()
         self.frame.clipboard_append(text)
         print(text)
@@ -120,25 +120,22 @@ class Grid:
 
 
 def parse_grid(text):
-    names = ast.literal_eval(text)
+    values = ast.literal_eval(text)
 
-    name_colors = {name: color for name, color in PALETTE}
-    name_colors[""] = EMPTY_COLOR
-    for row in names:
-        for name in row:
-            if name not in name_colors:
-                raise ValueError(f"Unknown colour: {name}")
-    return [[name_colors[name] for name in row] for row in names]
+    for row in values:
+        for value in row:
+            # bool is a subclass of int, so rule it out explicitly
+            if type(value) is not int or not 0 <= value <= 9:
+                raise ValueError(f"Not a colour value (0-9): {value!r}")
+    return [[PALETTE[value] for value in row] for row in values]
 
 
 def on_swatch_click(event):
     global brush_color
     # event.widget is the swatch that was clicked, its background is its color
     brush_color = event.widget.cget("bg")
-    # Show the name of the selected color
-    for name, color in PALETTE:
-        if color == brush_color:
-            color_label.config(text=name)
+    # Show the value of the selected color
+    color_label.config(text=PALETTE.index(brush_color))
 
 
 def on_grid_count_change():
@@ -206,11 +203,11 @@ for count in (1, 2):
 palette = tk.Frame(top)
 palette.pack(side=tk.LEFT, padx=(20, 0))
 # macOS ignores the background color of buttons so I just used labels instead
-for name, color in PALETTE:
+for color in PALETTE:
     swatch = tk.Label(palette, bg=color, width=2, height=1)
     swatch.pack(side=tk.LEFT, padx=2)
     swatch.bind("<Button-1>", on_swatch_click)
-color_label = tk.Label(palette, text=PALETTE[0][0], width=7, anchor="w")
+color_label = tk.Label(palette, text=1, width=2, anchor="w")
 color_label.pack(side=tk.LEFT, padx=5)
 
 tk.Button(top, text="Reset", command=reset_grids).pack(side=tk.LEFT, padx=(20, 0))

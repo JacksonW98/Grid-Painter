@@ -4,6 +4,7 @@ SIDE = 900  # longer side of each grid
 MARGIN = 40
 GAP = 60
 LINE_WIDTH = 3
+LINE_COLOR = "#555555"  # grey, so lines show up on the black (0) background
 LABEL_SIZE = 36
 LABEL_SPACE = 30  # room above the grids for the size labels
 
@@ -39,9 +40,9 @@ def make_image(grids):
                 draw.rectangle([xs[col], ys[row], xs[col + 1], ys[row + 1]], fill=grid[row][col])
 
         for x in xs:
-            draw.rectangle([x - before, upper, x + after, lower], fill="black")
+            draw.rectangle([x - before, upper, x + after, lower], fill=LINE_COLOR)
         for y in ys:
-            draw.rectangle([left, y - before, right, y + after], fill="black")
+            draw.rectangle([left, y - before, right, y + after], fill=LINE_COLOR)
 
         draw.text((left, upper - 12), f"{cols} x {rows}", fill="black", font=font, anchor="ls")
         x0 += cell * cols + GAP
